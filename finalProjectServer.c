@@ -16,6 +16,11 @@
 
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 
+
+int sendFile(char fileName[], SOCKET *socket);
+
+
+
 int main(int argc , char *argv[])
 {
 	WSADATA wsa;
@@ -67,54 +72,73 @@ int main(int argc , char *argv[])
 		printf("accept failed with error code : %d" , WSAGetLastError());
 	}
 	
-	while(1){
-		
-		//read file location sent by client and store it
-		char incCom[COMLENGTH];
-		int recCmd = read(new_socket, incCom, COMLENGTH);
-		incCom[recCmd] = 0;
-		printf("sending: %s",incCom);
-		
-		//open file at location
-		int fd = open(incCom,O_RDONLY);
-		
-		//mark the end of the file the bring pointer back to front of file
-		int fileEnd = lseek(fd,0,SEEK_END);
-		lseek(fd,0,SEEK_SET);
-		int chIdx = 0;
-		do{
-			
-			//read file contents and send them through socket to client
-			recCmd = read(fd,incCom,COMLENGTH);
-			write(new_socket,incCom,recCmd);
-			chIdx += recCmd;
-		} while(chIdx < fileEnd);
-		
-		printf("%d/%d\n",chIdx,fileEnd);
-	}
-		
-		
-
-
-	
-	
 	puts("Connection accepted");
 	
-	
-	
-
 	//Reply to client
-	message = "Hello Client , I have received your connection. But I have to go now, bye\n";
-	send(new_socket , message , strlen(message) , 0);
+	//message = "Hello Client , I have received your connection. But I have to go now, bye\n";
+	//send(new_socket , message , strlen(message) , 0);
 	
-	getchar();
+	//getchar();
+
+	char fileName[20];
+	strcpy(fileName,"copyThis.txt");
+	
+	sendFile("copyThis.txt", &new_socket);
+
 
 	//close connection
 	closesocket(s);
 	WSACleanup();
 	
 	return 0;
-}	
+}
 
-
-//test changes
+int sendFile(char fileName[], SOCKET *socket){
+	
+	FILE *fp;
+	FILE *fs;
+	char buffer[20];
+	int currentIdx = 0;
+	int lastIdx;
+	int n;
+	
+	//printf("activated sendFile");
+	
+	fp = fopen(fileName, "r");
+	//printf("opened file");
+	
+	fs = fdopen(*socket, "w");
+	//printf("socket link up");
+	
+	//connect to designated file
+	if(fp == NULL){
+		printf("failed to open file");
+		return(0);
+	} else {
+		printf("sending file, buffer length %d\n",strlen(buffer));
+		//find last index position then return to start of file
+		fseek(fp,0,SEEK_END);
+		lastIdx = ftell(fp);
+		fseek(fp,0,SEEK_SET);
+		
+		do{
+			
+			//Sleep(2000);
+			
+			//get chunk of data from file and add length to idx
+			fgets(buffer, 20, fp);
+			n = strlen(buffer);
+			currentIdx += n;
+			
+			//send data across stream
+			send(*socket , buffer , strlen(buffer) , 0);
+			//write (*socket, buffer, strlen(buffer));
+			
+			printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
+			
+			//printf(".\n");
+		} while(currentIdx < lastIdx);
+		
+		printf("sent %d out of %d",currentIdx,lastIdx);
+	}
+}

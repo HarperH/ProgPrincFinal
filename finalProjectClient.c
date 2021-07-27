@@ -12,6 +12,13 @@
 
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 
+
+#define BUFFERLEN 2000
+
+
+int receiveFile(char fileName[], SOCKET *socket);
+
+
 int main(int argc , char *argv[])
 {
 	WSADATA wsa;
@@ -36,9 +43,9 @@ int main(int argc , char *argv[])
 	printf("Socket created.\n");
 	
 	
-	server.sin_addr.s_addr = inet_addr("192.168.88.152");
+	server.sin_addr.s_addr = inet_addr("192.168.88.125");
 	server.sin_family = AF_INET;
-	server.sin_port = htons( 80 );
+	server.sin_port = htons( 8888 );
 
 	//Connect to remote server
 	if (connect(s , (struct sockaddr *)&server , sizeof(server)) < 0)
@@ -49,28 +56,51 @@ int main(int argc , char *argv[])
 	
 	puts("Connected");
 	
+	char fileName[20];
+	strcpy(fileName,"thisIsCopy.txt");
 	
-	//take input and create local file to copy data to
-	char *str = argv[1];
-	char buf[5];
-	int n;
-	int fd = open (str,O_CREAT | O_WRONLY,S_IRUSR|S_IWUSR);
-	n = write(s,str,strlen(str));
-	int idx = 0;
-	do {
-		n = read (s,buf,5);
-        idx += n;
-        printf(".");
-        fflush(stdout);
-        write (fd,buf,n);
-    } while (n > 0);
-	
-	printf("copied %s successfully from server",str);
-	
-	
+	receiveFile(fileName, &s);
 	
 
 	return 0;
 }
 
-//test changes
+
+int receiveFile(char fileName[], SOCKET *socket){
+	
+	FILE *fp;
+	FILE *fs;
+	char buffer[BUFFERLEN];
+	int n;
+	int len;
+	
+	fp = fopen(fileName,"w");
+	fs = fdopen(*socket, "r");
+	
+	//verify the file can be created
+	if(fp == NULL){
+		printf("failed to open file");
+		return(0);
+	} else {
+		
+		printf("copying file\n");		
+		//sleep(1);
+		
+		while((len=recv(*socket,buffer,BUFFERLEN,0)) > 0){
+			printf("len is: %d",len);
+			buffer[len] = '\0';
+			fputs(buffer,fp);
+			printf("copied: %s\n",buffer);
+		}
+		
+		printf("last len: %d",len);
+		
+		
+		
+		
+		
+		printf("file copied");
+		//return to to show success
+		return(1);
+	}
+}
