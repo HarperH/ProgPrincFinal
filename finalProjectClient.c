@@ -84,20 +84,34 @@ int receiveFile(char fileName[], SOCKET *socket){
 	} else {
 		
 		printf("copying file\n");		
-		//sleep(1);
 		
-		while((len=recv(*socket,buffer,BUFFERLEN,0)) > 0){
+		
+		len=recv(*socket,buffer,BUFFERLEN,0);
+		if(len < 1){
+			printf("got nothing");
+			sleep(2);
+			len=recv(*socket,buffer,BUFFERLEN,0);
+			printf("\n%s\n",buffer);
+		}
+		
+		while(len > 0){
 			printf("len is: %d",len);
 			buffer[len] = '\0';
 			fputs(buffer,fp);
 			printf("copied: %s\n",buffer);
+			
+			len=recv(*socket,buffer,BUFFERLEN,0);
+			/*
+			if(len < 1){
+				printf("sleeping\n");
+				sleep(2);
+				len=recv(*socket,buffer,BUFFERLEN,0);
+				printf("\n%s\n",buffer);
+			}
+			*/
 		}
 		
 		printf("last len: %d",len);
-		
-		
-		
-		
 		
 		printf("file copied");
 		//return to to show success

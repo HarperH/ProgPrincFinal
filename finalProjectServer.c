@@ -117,18 +117,23 @@ int sendFile(char fileName[], SOCKET *socket){
 	} else {
 		printf("sending file, buffer length %d\n",strlen(buffer));
 		//find last index position then return to start of file
+		//so that we know how many characters to send
 		fseek(fp,0,SEEK_END);
 		lastIdx = ftell(fp);
 		fseek(fp,0,SEEK_SET);
 		
 		do{
 			
-			//Sleep(2000);
-			
 			//get chunk of data from file and add length to idx
 			fgets(buffer, 20, fp);
 			n = strlen(buffer);
 			currentIdx += n;
+			
+			//newlines are counted twice by fseek but only once
+			//when being sent across, so lastIdx needs to be adjusted
+			if(buffer[n-1] == '\n'){
+				lastIdx--;
+			}
 			
 			//send data across stream
 			send(*socket , buffer , strlen(buffer) , 0);
