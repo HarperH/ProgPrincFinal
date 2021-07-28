@@ -113,10 +113,10 @@ int connect_to_server(SOCKET *s){
     
     struct sockaddr_in server;
     char ip_address[15];
-    printf("What address would you like to connect to: ");
-    scanf("%s", &ip_address);
+    /*printf("What address would you like to connect to: ");
+    scanf("%s", &ip_address);*/
     
-    server.sin_addr.s_addr = inet_addr(ip_address);
+    server.sin_addr.s_addr = inet_addr("192.168.88.152");
     server.sin_family = AF_INET;
     server.sin_port = htons(8888);
     
@@ -166,19 +166,21 @@ int connect_to_server(SOCKET *s){
 int send_commands_to_server(SOCKET *s){
     
     printf("Displaying the contents of the C drive.\n");
-    //char dir_name[] = "C:\\";
-    char *command = "What the hell.";
-    int error = send(*s, command, (int) strlen(command), 0);
-    if(error == 0){
-        printf("Success\n");
-    }
-    else{
-        printf("Failed to send\n");
-    }
+    char *command;
+    command = "1";
+    int bytes_sent = send(*s, command, (int)strlen(command), 0);
     
     /*int selection;
     printf("What woud you like to do.\n1: Move directories.\n2: Scan contents of a file for information.\n3: Create a file.\n4: Pull a file.");
     scanf("%d", &selection);*/
+    
+    /*char *message;
+    message = "GET / HTTP/1.1\r\n\r\n";
+    if( send(sock , message , strlen(message) , 0) < 0)
+	{
+		puts("Send failed");
+		return 1;
+	}*/
     
     
     

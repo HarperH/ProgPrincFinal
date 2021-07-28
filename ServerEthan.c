@@ -14,12 +14,14 @@ int set_server_to_listen(SOCKET *socket, int number_of_devices);
 int accept_socket_request(SOCKET *socket, SOCKET *client);
 void navigate_directories(SOCKET *socket, SOCKET *client);
 void scan_directory(char directory_path[]);
+char* recieve_information(SOCKET *client);
 
 int main(int argc, char **argv)
 {
     SOCKET sock, client_socket;
     WSADATA winsock;
     int flag = 0;
+    char command[100];
     
     
     init_winsock(&winsock);
@@ -27,7 +29,14 @@ int main(int argc, char **argv)
     bind_socket(&sock);
     set_server_to_listen(&sock, 1);
     accept_socket_request(&sock, &client_socket);
-    navigate_directories(&sock, &client_socket);
+    recieve_information(&client_socket);
+    
+    
+    
+    //navigate_directories(&sock, &client_socket);
+    //192.168.88.152
+    
+    
     
     closesocket(sock);
     WSACleanup();
@@ -121,24 +130,31 @@ int accept_socket_request(SOCKET *socket, SOCKET *client){
     }
 }
 
+
+
 void navigate_directories(SOCKET *socket, SOCKET *client){
     
-    //192.168.88.152
-    char command[100];
-    int size;
-    size = recv(*client, command, 100, 0);
-    if(size == 0){
-        printf("Success\n");
-        command[strlen(command)] = '\0';
-        printf("%c", command[0]);
-    }
-    else{
-        printf("Failed to recieve.");
-    }
     
 }
 
 void scan_directories(char directory_path[]){
     
+    
+}
+
+char* recieve_information(SOCKET *client){
+    
+    char command[100];
+    int size;
+    if((size = recv(*client , command , 100 , 0)) == SOCKET_ERROR)
+	{
+		printf("Failed to recieve.");
+	}
+    else{
+        command[size] = '\0';
+        printf("Recieved Message: %s");
+    }
+    
+    return command;
     
 }
