@@ -74,19 +74,14 @@ int main(int argc , char *argv[])
 	}
 	
 	puts("Connection accepted");
-	
-	//Reply to client
-	//message = "Hello Client , I have received your connection. But I have to go now, bye\n";
-	//send(new_socket , message , strlen(message) , 0);
-	
-	//getchar();
 
 	char fileName[20];
 	strcpy(fileName,"copyThis.txt");
 	
 	sendFile("copyThis.txt", &new_socket);
 
-
+	sleep(5);
+	
 	//close connection
 	closesocket(s);
 	WSACleanup();
@@ -105,6 +100,7 @@ int sendFile(char fileName[], SOCKET *socket){
 	int currentIdx = 0;
 	int lastIdx;
 	int n;
+	int sentBytes = 0;
 	
 	fp = fopen(fileName, "r");
 	
@@ -114,20 +110,13 @@ int sendFile(char fileName[], SOCKET *socket){
 		return(0);
 		
 	} else {
-		//printf("sending file, buffer length %d\n",strlen(buffer));
 		
-		//find last index position then return to start of file
-		//so that we know how many characters to send
-		//fseek(fp,0,SEEK_END);
-		//lastIdx = ftell(fp);
-		//fseek(fp,0,SEEK_SET);
-		
+		//find size of file so other side knows how many
+		//bytes to wait for
 		fileSizeTest = getFileSize(fileName);
-		
 		itoa(fileSizeTest,filesize,10);
-		
 		send(*socket, filesize, 8 , 0);
-		printf("sent filesize of: %s\n",filesize);
+		//printf("sent filesize of: %s\n",filesize);
 		
 		do{
 			
@@ -136,26 +125,23 @@ int sendFile(char fileName[], SOCKET *socket){
 			n = strlen(buffer);
 			currentIdx += n;
 			
-			//newlines are counted twice by fseek but only once
-			//when being sent across, so lastIdx needs to be adjusted
-			//if(buffer[n-1] == '\n'){
-			//	lastIdx--;
-			//}
-			
 			//send data across stream
-			send(*socket , buffer , strlen(buffer) , 0);
+			sentBytes = send(*socket , buffer , strlen(buffer) , 0);
 			
+			//printf("sent: %d\n",sentBytes);
 			//printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
 			
 			//printf(".\n");
 		} while(currentIdx < fileSizeTest);
 		
-		printf("sent %d out of %d",currentIdx,fileSizeTest);
+		printf("sent file");
+		//printf("sent %d out of %d",currentIdx,fileSizeTest);
 		
 		return(1);
 	}
 }
 
+//count number of chars in a file
 int getFileSize(char fileName[]){
 	
 	FILE *fp;
@@ -165,6 +151,6 @@ int getFileSize(char fileName[]){
 	while((nextChar = fgetc(fp)) != EOF){
 		charCount++;
 	}
-	printf("%d",charCount);
+	//printf("%d",charCount);
 	return(charCount);
 }

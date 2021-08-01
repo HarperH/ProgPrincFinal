@@ -78,11 +78,25 @@ int receiveFile(char fileName[], SOCKET *socket){
 	int len;
 	int currentIdx = 0;
 	int lastIdx;
+	char *readyCheck;
+	int flag;
+	int checkLen;
 	
 	
 	fp = fopen(fileName,"w");
 	fs = fdopen(*socket, "r");
-	//sleep(1);
+	/*
+	while(flag == 0){
+		checkLen = recv(*socket, readyCheck, 100,0);
+		readyCheck[checkLen] = '\0';
+		send(*socket, "readyrecv", strlen("readyrecv"),0);
+		if(strcmp(readyCheck,"readysend")==0){
+			flag = 1;
+		}
+	}
+	*/
+	
+	//sleep(5);
 	//verify the file can be created
 	if(fp == NULL){
 		printf("failed to open file");
@@ -96,18 +110,20 @@ int receiveFile(char fileName[], SOCKET *socket){
 		incFileSize=recv(*socket,filesize,BUFFERLEN,0);
 		if(incFileSize < 1){
 			do{
-				printf("transfer failed, retrying");
+				printf("didn't receive file size, retrying");
 				sleep(1);
 				len=recv(*socket,filesize,BUFFERLEN,0);
 				printf("\n%s\n",filesize);
 			} while (incFileSize < 1);
 		} else {
 			lastIdx = atoi(filesize);
-			printf("received file size of: %d\n",lastIdx);
+			//printf("received file size of: %d\n",lastIdx);
 		}
 		
-		
+		sleep(1);
 		len = recv(*socket,buffer,BUFFERLEN,0);
+		//printf("len is: %d",len);
+		//printf("%d,%s\n",len,buffer);
 		while(len < 0 && n < 3){
 			n++;
 			printf("transfer failed, retrying\n");
@@ -115,30 +131,26 @@ int receiveFile(char fileName[], SOCKET *socket){
 			len=recv(*socket,filesize,BUFFERLEN,0);
 		}
 		
-		while(currentIdx < lastIdx && n < 6){
-			/*while(len < 0 && j < 10){
-				j++;
-				sleep(1);
-				printf("retrying\n");
-				len = recv(*socket,buffer,BUFFERLEN,0);
-			}
-			*/
-			n++;
-			printf("len is: %d",len);
+		while(currentIdx < lastIdx){
+
+			//n++;
+			//printf("len is: %d",len);
 			if(len < 0){
 				len = 0;
+				sleep(1);
 			}
 			currentIdx += len;
 			buffer[len] = '\0';
 			fputs(buffer,fp);
-			printf("copied: %s\n",buffer);
+			//printf("copied: %s\n",buffer);
 
-			printf("%d out of %d", currentIdx,lastIdx);
+			//printf("%d out of %d\n", currentIdx,lastIdx);
 			
 			len=recv(*socket,buffer,BUFFERLEN,0);
+			//printf("len is: %d\n",len);
 		}
 		
-		printf("last len: %d",len);
+		//printf("last len: %d",len);
 		
 		printf("file copied");
 		//return to to show success
