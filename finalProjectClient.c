@@ -13,7 +13,7 @@
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 
 
-#define BUFFERLEN 2000
+#define BUFFERLEN 500
 
 
 int receiveFile(char fileName[], SOCKET *socket);
@@ -55,7 +55,7 @@ int main(int argc , char *argv[])
 	}
 	
 	puts("Connected");
-	
+	//fflush(stdout);
 	char fileName[20];
 	strcpy(fileName,"thisIsCopy.txt");
 	
@@ -71,12 +71,18 @@ int receiveFile(char fileName[], SOCKET *socket){
 	FILE *fp;
 	FILE *fs;
 	char buffer[BUFFERLEN];
-	int n;
+	char filesize[8];
+	int incFileSize;
+	int n=0;
+	int j=0;
 	int len;
+	int currentIdx = 0;
+	int lastIdx;
+	
 	
 	fp = fopen(fileName,"w");
 	fs = fdopen(*socket, "r");
-	
+	//sleep(1);
 	//verify the file can be created
 	if(fp == NULL){
 		printf("failed to open file");
@@ -86,29 +92,50 @@ int receiveFile(char fileName[], SOCKET *socket){
 		printf("copying file\n");		
 		
 		
-		len=recv(*socket,buffer,BUFFERLEN,0);
-		if(len < 1){
-			printf("got nothing");
-			sleep(2);
-			len=recv(*socket,buffer,BUFFERLEN,0);
-			printf("\n%s\n",buffer);
+		//receive number of incoming characters
+		incFileSize=recv(*socket,filesize,BUFFERLEN,0);
+		if(incFileSize < 1){
+			do{
+				printf("transfer failed, retrying");
+				sleep(1);
+				len=recv(*socket,filesize,BUFFERLEN,0);
+				printf("\n%s\n",filesize);
+			} while (incFileSize < 1);
+		} else {
+			lastIdx = atoi(filesize);
+			printf("received file size of: %d\n",lastIdx);
 		}
 		
-		while(len > 0){
+		
+		len = recv(*socket,buffer,BUFFERLEN,0);
+		while(len < 0 && n < 3){
+			n++;
+			printf("transfer failed, retrying\n");
+			sleep(1);
+			len=recv(*socket,filesize,BUFFERLEN,0);
+		}
+		
+		while(currentIdx < lastIdx && n < 6){
+			/*while(len < 0 && j < 10){
+				j++;
+				sleep(1);
+				printf("retrying\n");
+				len = recv(*socket,buffer,BUFFERLEN,0);
+			}
+			*/
+			n++;
 			printf("len is: %d",len);
+			if(len < 0){
+				len = 0;
+			}
+			currentIdx += len;
 			buffer[len] = '\0';
 			fputs(buffer,fp);
 			printf("copied: %s\n",buffer);
+
+			printf("%d out of %d", currentIdx,lastIdx);
 			
 			len=recv(*socket,buffer,BUFFERLEN,0);
-			/*
-			if(len < 1){
-				printf("sleeping\n");
-				sleep(2);
-				len=recv(*socket,buffer,BUFFERLEN,0);
-				printf("\n%s\n",buffer);
-			}
-			*/
 		}
 		
 		printf("last len: %d",len);

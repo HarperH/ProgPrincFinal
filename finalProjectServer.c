@@ -18,6 +18,7 @@
 
 
 int sendFile(char fileName[], SOCKET *socket);
+int getFileSize(char filename[]);
 
 
 
@@ -97,53 +98,73 @@ int sendFile(char fileName[], SOCKET *socket){
 	
 	FILE *fp;
 	FILE *fs;
-	char buffer[20];
+	char buffer[500];
+	char filesize[8];
+	int fileSizeTest;
+	int outFileSize;
 	int currentIdx = 0;
 	int lastIdx;
 	int n;
 	
-	//printf("activated sendFile");
-	
 	fp = fopen(fileName, "r");
-	//printf("opened file");
 	
-	fs = fdopen(*socket, "w");
-	//printf("socket link up");
-	
-	//connect to designated file
+	//check if file was successfully opened
 	if(fp == NULL){
 		printf("failed to open file");
 		return(0);
+		
 	} else {
-		printf("sending file, buffer length %d\n",strlen(buffer));
+		//printf("sending file, buffer length %d\n",strlen(buffer));
+		
 		//find last index position then return to start of file
 		//so that we know how many characters to send
-		fseek(fp,0,SEEK_END);
-		lastIdx = ftell(fp);
-		fseek(fp,0,SEEK_SET);
+		//fseek(fp,0,SEEK_END);
+		//lastIdx = ftell(fp);
+		//fseek(fp,0,SEEK_SET);
+		
+		fileSizeTest = getFileSize(fileName);
+		
+		itoa(fileSizeTest,filesize,10);
+		
+		send(*socket, filesize, 8 , 0);
+		printf("sent filesize of: %s\n",filesize);
 		
 		do{
 			
 			//get chunk of data from file and add length to idx
-			fgets(buffer, 20, fp);
+			fgets(buffer, 500, fp);
 			n = strlen(buffer);
 			currentIdx += n;
 			
 			//newlines are counted twice by fseek but only once
 			//when being sent across, so lastIdx needs to be adjusted
-			if(buffer[n-1] == '\n'){
-				lastIdx--;
-			}
+			//if(buffer[n-1] == '\n'){
+			//	lastIdx--;
+			//}
 			
 			//send data across stream
 			send(*socket , buffer , strlen(buffer) , 0);
-			//write (*socket, buffer, strlen(buffer));
 			
-			printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
+			//printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
 			
 			//printf(".\n");
-		} while(currentIdx < lastIdx);
+		} while(currentIdx < fileSizeTest);
 		
-		printf("sent %d out of %d",currentIdx,lastIdx);
+		printf("sent %d out of %d",currentIdx,fileSizeTest);
+		
+		return(1);
 	}
+}
+
+int getFileSize(char fileName[]){
+	
+	FILE *fp;
+	char nextChar;
+	int charCount = 0;
+	fp = fopen(fileName, "r");
+	while((nextChar = fgetc(fp)) != EOF){
+		charCount++;
+	}
+	printf("%d",charCount);
+	return(charCount);
 }
