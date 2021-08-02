@@ -3,6 +3,9 @@
 #include <windows.h>
 #include <ws2tcpip.h>
 #include <stdlib.h>
+#include <dirent.h>
+#include <string.h>
+#include <unistd.h>
 
 #define MAX_FILE_NAME_LENGTH 100
 #define MAX_NUMBER_OF_FOLDERS 500
@@ -13,15 +16,14 @@ int bind_socket(SOCKET *unbound_socket);
 int set_server_to_listen(SOCKET *socket, int number_of_devices);
 int accept_socket_request(SOCKET *socket, SOCKET *client);
 void navigate_directories(SOCKET *socket, SOCKET *client);
-void scan_directory(char directory_path[]);
-char* recieve_information(SOCKET *client);
+void scan_directories(char directory_path[], SOCKET *client);
+int recieve_information(SOCKET *client);
 
 int main(int argc, char **argv)
 {
     SOCKET sock, client_socket;
     WSADATA winsock;
     int flag = 0;
-    char command[100];
     
     
     init_winsock(&winsock);
@@ -31,14 +33,8 @@ int main(int argc, char **argv)
     accept_socket_request(&sock, &client_socket);
     recieve_information(&client_socket);
     
-    
-    
-    //navigate_directories(&sock, &client_socket);
-    //192.168.88.152
-    
-    
-    
     closesocket(sock);
+    closesocket(client_socket);
     WSACleanup();
     
 	return 0;
@@ -130,31 +126,74 @@ int accept_socket_request(SOCKET *socket, SOCKET *client){
     }
 }
 
+void scan_directories(char directory_path[], SOCKET *client){
+    
+    printf("Directory being scanned: %s\n", directory_path);
+    
+    char list_files_and_folders[MAX_NUMBER_OF_FOLDERS][MAX_FILE_NAME_LENGTH];
+    char *message;
+    int count = 0;
+    DIR *given_directory = opendir(directory_path);
+    struct dirent *stream;
+  
+    sleep(2);
+    if (given_directory == NULL)
+    {
+        printf("Could not open current directory" );
+    }
 
-
-void navigate_directories(SOCKET *socket, SOCKET *client){
-    
-    
-}
-
-void scan_directories(char directory_path[]){
-    
-    
-}
-
-char* recieve_information(SOCKET *client){
-    
-    char command[100];
-    int size;
-    if((size = recv(*client , command , 100 , 0)) == SOCKET_ERROR)
-	{
-		printf("Failed to recieve.");
-	}
-    else{
-        command[size] = '\0';
-        printf("Recieved Message: %s");
+    //Stores directory info in list of files and folders
+    while((stream = readdir(given_directory)) != NULL){
+        if((strcmp(stream->d_name, ".") != 0) && (strcmp(stream->d_name, "..") != 0)){
+            strcpy(list_files_and_folders[count], stream->d_name);
+            count++;
+        }
     }
     
-    return command;
+    printf("Number of folders in directory: %d\n", count);
     
+    //Sends all the folders and files in the directory
+    for(int i = 0; i < count; i++){
+        send(*client, list_files_and_folders[i], 100, 0);
+    }
+    
+    send(*client, "done", strlen("done"), 0);
+    
+    printf("Finished sending %s files\n", directory_path);
+    closedir(given_directory);
+    
+}
+
+int recieve_information(SOCKET *client){
+    
+    char command[2000];
+    int size;
+    int flag = 0;
+        
+    while(((size = recv(*client , command, 100 , 0)) == -1) || (flag == 0)){
+            
+        if(size != -1)
+        {
+            command[size] = '\0';
+            printf("Recieved Command: %s\n", command);
+            sleep(5);
+            if(strcmp(command, "init") == 0){
+                printf("Sending C Drive Information....\n");
+                scan_directories("C:\\", client);
+                printf("Finished Sending C Drive Information.\n");
+                flag = 0;
+            }
+            else if(strcmp(command, "move") == 0){
+                size = recv(*client, command, 2000, 0);
+                while(size == -1){
+                    size = recv(*client, command, 2000, 0);
+                }
+                command[size] = '\0';
+                printf("Moving to directory: %s\n", command);
+                sleep(5);
+                scan_directories(command, client);
+                flag = 0;
+            }
+        }
+    }
 }

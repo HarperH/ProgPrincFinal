@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
 #define MAX_FILE_NAME_LENGTH 100
 #define MAX_NUMBER_OF_FOLDERS 500
@@ -13,43 +14,10 @@
 int init_winsock(WSADATA *ws);
 int create_socket(SOCKET *s);
 int connect_to_server(SOCKET *s);
-int send_commands_to_server(SOCKET *s);
+void navigate_directories(SOCKET *s);
 
 int main(int argc, char **argv)
 {
-    
-    
-    /*printf("Which would you like to go to: ");
-    scanf("%d", &selection);
-    realloc(dir_name, sizeof(dir_name)+strlen(list_files_and_folders[selection-1])+1);
-    strcat(dir_name, list_files_and_folders[selection-1]);
-    
-    printf("%s\n",dir_name);
-    
-    given_directory = opendir(dir_name);
-  
-    if (given_directory == NULL)
-    {
-        printf("\nCould not open current directory: %s\n",strerror(errno));
-    }
-    
-    count = 0;
-    
-    while((stream = readdir(given_directory)) != NULL){
-        if((strcmp(stream->d_name, ".") != 0) && (strcmp(stream->d_name, "..") != 0)){
-            strcpy(list_files_and_folders[count], stream->d_name);
-            count++;
-        }
-    }
-    
-    for(int i = 0; i < count; i++){
-        printf("%d: %s\n", i+1, list_files_and_folders[i]);
-    }
-    
-    closedir(given_directory);*/
-    
-    
-    
     
     SOCKET sock;
     WSADATA winsock;
@@ -58,7 +26,7 @@ int main(int argc, char **argv)
     init_winsock(&winsock);
     create_socket(&sock);
     connect_to_server(&sock);
-    send_commands_to_server(&sock);
+    navigate_directories(&sock);
     
     closesocket(sock);
     WSACleanup();
@@ -113,10 +81,10 @@ int connect_to_server(SOCKET *s){
     
     struct sockaddr_in server;
     char ip_address[15];
-    /*printf("What address would you like to connect to: ");
-    scanf("%s", &ip_address);*/
+    printf("What address would you like to connect to: ");
+    scanf("%s", &ip_address);
     
-    server.sin_addr.s_addr = inet_addr("192.168.88.152");
+    server.sin_addr.s_addr = inet_addr(ip_address);
     server.sin_family = AF_INET;
     server.sin_port = htons(8888);
     
@@ -133,55 +101,168 @@ int connect_to_server(SOCKET *s){
     }
 }
 
-/*void navigate_directories(){
+void navigate_directories(SOCKET *s){
     
-    char dir_name[] = "C:\\";
-    char list_files_and_folders[MAX_NUMBER_OF_FOLDERS][MAX_FILE_NAME_LENGTH];
+    char *dir_name;
+    dir_name = malloc(4);
+    dir_name[0] = 'C';
+    dir_name[1] = ':';
+    dir_name[2] = '\\';
+    dir_name[3] = '\0';
+    
+    
+    //Displays C Drive Information
+    char *command;
+    command = "init";
+    char list_files_and_folders[MAX_FILE_NAME_LENGTH][MAX_NUMBER_OF_FOLDERS];
     int count = 0;
+    int flag = 0;
+    int size;
     int selection;
-    DIR *given_directory = opendir(dir_name);
-    struct dirent *stream;
-  
-    if (given_directory == NULL)
-    {
-        printf("Could not open current directory" );
-    }
     
-    while((stream = readdir(given_directory)) != NULL){
-        if((strcmp(stream->d_name, ".") != 0) && (strcmp(stream->d_name, "..") != 0)){
-            strcpy(list_files_and_folders[count], stream->d_name);
-            count++;
+    //Sends Command to Server to request C Drive Info
+    printf("Sending C Drive request to server.\n");
+    send(*s, command, (int)strlen(command), 0);
+    
+    
+    //Recieves C drive info
+    while(((size = recv(*s , list_files_and_folders[count], 100 , 0)) == -1) || (flag == 0)){
+        while(size != -1){
+                count++;
+                size = recv(*s , list_files_and_folders[count], 100 , 0);
+                if(size == 4){
+                    flag = 1;
+                    size = -1;
+                    count++;
+                }
+        }
+        if(flag == 1){
+            break;
         }
     }
     
-    //Lists all the folders and files in the C drive
+    
+    //Puts info into a list
+    for(int i = 0; i < count; i++){
+        if(strcmp(list_files_and_folders[i], "done") == 0){
+            count = i;
+            break;
+        }
+    }
+    
+    
+    //Prints the C drive
     for(int i = 0; i < count; i++){
         printf("%d: %s\n", i+1, list_files_and_folders[i]);
     }
     
     
-    printf("What would you like to do.\n1:  ")
-}*/
-
-int send_commands_to_server(SOCKET *s){
-    
-    printf("Displaying the contents of the C drive.\n");
-    char *command;
-    command = "1";
-    int bytes_sent = send(*s, command, (int)strlen(command), 0);
-    
-    /*int selection;
-    printf("What woud you like to do.\n1: Move directories.\n2: Scan contents of a file for information.\n3: Create a file.\n4: Pull a file.");
-    scanf("%d", &selection);*/
-    
-    /*char *message;
-    message = "GET / HTTP/1.1\r\n\r\n";
-    if( send(sock , message , strlen(message) , 0) < 0)
-	{
-		puts("Send failed");
-		return 1;
-	}*/
-    
-    
-    
+    while(selection != 6){
+        printf("\n\nWhat woud you like to do.\n1: Move directories.\n2: Scan contents of a file for information.\n3: Create a file.\n"
+                "4: Pull a file.\n5: Display current Directory info.\n6: Exit\n--> ");
+        scanf("%d", &selection);
+        
+        if(selection == 1){
+            
+            //Tells the server we are changing directories
+            command = "move";
+            send(*s, command, 100, 0);
+            
+            //Tells the server which folder we would like to go into
+            printf("Where would you like to go: (Select -1 to move up a directory): ");
+            scanf("%d", &selection);
+            if(selection != -1){
+                
+                //Sends this path to the server
+                dir_name = (char *) realloc(dir_name, sizeof(dir_name) + strlen(list_files_and_folders[selection-1]));
+                strcat(dir_name, list_files_and_folders[selection-1]);
+                strcat(dir_name, "\\");
+                printf("Moving to %s\n", dir_name);
+                send(*s, dir_name, (int)strlen(dir_name), 0);
+                
+                
+                //gcc clientethan.c -o main -lws2_32
+                count = 0;
+                size = -1;
+                flag = 0;
+                printf("Waiting for file information.\n");
+                //Recieves folder information from the server then populates list_files_and_folders then displays this list
+                while(((size = recv(*s , list_files_and_folders[count], 100 , 0)) == -1) || (flag == 0)){
+                    while(size != -1){
+                            count++;
+                            size = recv(*s , list_files_and_folders[count], 100 , 0);
+                            if(size == 4){
+                                flag = 1;
+                                size = -1;
+                                count++;
+                            }
+                    }
+                    if(flag == 1){
+                        break;
+                    }
+                }
+                
+                
+                for(int i = 0; i < count; i++){
+                    if(strcmp(list_files_and_folders[i], "done") == 0){
+                        count = i;
+                        break;
+                    }
+                }
+                
+                
+                for(int i = 0; i < count; i++){
+                    printf("%d: %s\n", i+1, list_files_and_folders[i]);
+                }
+                
+            }
+            else{
+                
+                int len = strlen(dir_name);
+                for(int j = len; j > 0; j--){
+                    if((dir_name[j-1] != '\\') || (j == len)){
+                        dir_name[strlen(dir_name)-1] = '\0';
+                    }
+                    else{
+                        j = 0;
+                    }
+                }
+                
+                send(*s, dir_name, (int)strlen(dir_name), 0);
+                
+                count = 0;
+                size = -1;
+                flag = 0;
+                printf("Waiting for file information.\n");
+                //Recieves folder information from the server then populates list_files_and_folders then displays this list
+                while(((size = recv(*s , list_files_and_folders[count], 100 , 0)) == -1) || (flag == 0)){
+                    while(size != -1){
+                            count++;
+                            size = recv(*s , list_files_and_folders[count], 100 , 0);
+                            if(size == 4){
+                                flag = 1;
+                                size = -1;
+                                count++;
+                            }
+                    }
+                    if(flag == 1){
+                        break;
+                    }
+                }
+                
+                for(int i = 0; i < count; i++){
+                    if(strcmp(list_files_and_folders[i], "done") == 0){
+                        count = i;
+                        break;
+                    }
+                }
+                
+                for(int i = 0; i < count; i++){
+                    printf("%d: %s\n", i+1, list_files_and_folders[i]);
+                }
+            }
+            
+            selection = 1;
+        }
+    }
 }
