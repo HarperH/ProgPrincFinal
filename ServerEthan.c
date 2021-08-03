@@ -640,7 +640,7 @@ int receiveFile(char fileName[], SOCKET *socket){
 	int checkLen;
 	
 	
-	fp = fopen(fileName,"w");
+	fp = fopen(fileName,"a");
 	fs = fdopen(*socket, "r");
 	/*
 	while(flag == 0){
@@ -653,7 +653,7 @@ int receiveFile(char fileName[], SOCKET *socket){
 	}
 	*/
 	
-	//sleep(5);
+	sleep(5);
 	//verify the file can be created
 	if(fp == NULL){
 		printf("failed to open file");
@@ -664,15 +664,16 @@ int receiveFile(char fileName[], SOCKET *socket){
 		
 		
 		//receive number of incoming characters
-		incFileSize=recv(*socket,filesize,BUFFERLEN,0);
+		incFileSize=recv(*socket,filesize,8,0);
 		if(incFileSize < 1){
 			do{
 				printf("didn't receive file size, retrying");
 				sleep(1);
-				len=recv(*socket,filesize,BUFFERLEN,0);
+				len=recv(*socket,filesize,8,0);
 				printf("\n%s\n",filesize);
 			} while (incFileSize < 1);
 		} else {
+            printf("received file size");
 			lastIdx = atoi(filesize);
 			//printf("received file size of: %d\n",lastIdx);
 		}
@@ -691,7 +692,7 @@ int receiveFile(char fileName[], SOCKET *socket){
 		while(currentIdx < lastIdx){
 
 			//n++;
-			//printf("len is: %d",len);
+			printf("len is: %d",len);
 			if(len < 0){
 				len = 0;
 				sleep(1);
@@ -699,13 +700,16 @@ int receiveFile(char fileName[], SOCKET *socket){
 			currentIdx += len;
 			buffer[len] = '\0';
 			fputs(buffer,fp);
-			//printf("copied: %s\n",buffer);
+			printf("copied: %s\n",buffer);
 
-			//printf("%d out of %d\n", currentIdx,lastIdx);
-			
+			printf("%d out of %d\n", currentIdx,lastIdx);
+			if(currentIdx == lastIdx){
+                break;
+            }
 			len=recv(*socket,buffer,BUFFERLEN,0);
 			//printf("len is: %d\n",len);
-		}
+	
+        }
 		
 		//printf("last len: %d",len);
 		

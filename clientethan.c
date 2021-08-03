@@ -356,7 +356,7 @@ void navigate_directories(SOCKET *s){
                 printf("Enter the file path that you would like to send: ");
                 scanf("%s", &message);
                 
-                sendFile(message, *s);
+                sendFile(message, s);
         }
         
         else if(selection == 4){
@@ -539,7 +539,7 @@ int sendFile(char fileName[], SOCKET *socket){
 		fileSizeTest = getFileSize(fileName);
 		itoa(fileSizeTest,filesize,10);
 		send(*socket, filesize, 8 , 0);
-		//printf("sent filesize of: %s\n",filesize);
+		printf("sent filesize of: %s\n",filesize);
 		
 		do{
 			
@@ -551,7 +551,7 @@ int sendFile(char fileName[], SOCKET *socket){
 			//send data across stream
 			sentBytes = send(*socket , buffer , strlen(buffer) , 0);
 			
-			//printf("sent: %d\n",sentBytes);
+			printf("sent: %d\n",sentBytes);
 			//printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
 			
 			//printf(".\n");
