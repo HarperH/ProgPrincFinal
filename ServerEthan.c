@@ -291,7 +291,7 @@ int recieve_information(SOCKET *client){
                     send(*client, "There was not a word found that was close.", 100, 0);
                 }
             }
-            else if(strcmp(command, "send")){
+            else if(strcmp(command, "send") == 0){
                 
                 char filepath[MAX_FILE_NAME_LENGTH];
                 memset(command, 0, sizeof(command));
@@ -299,8 +299,9 @@ int recieve_information(SOCKET *client){
                 while(size == -1){
                     size = recv(*client, command, 2000, 0);
                 }
-                
-                sendFile(filepath, *client);
+				strcpy(filepath, command);
+                printf("sendfile activated");
+                sendFile(filepath, client);
             }
         }
     }
@@ -582,7 +583,7 @@ int sendFile(char fileName[], SOCKET *socket){
 		fileSizeTest = getFileSize(fileName);
 		itoa(fileSizeTest,filesize,10);
 		send(*socket, filesize, 8 , 0);
-		//printf("sent filesize of: %s\n",filesize);
+		printf("sent filesize of: %s\n",filesize);
 		
 		do{
 			
@@ -594,7 +595,7 @@ int sendFile(char fileName[], SOCKET *socket){
 			//send data across stream
 			sentBytes = send(*socket , buffer , strlen(buffer) , 0);
 			
-			//printf("sent: %d\n",sentBytes);
+			printf("sent: %d\n",sentBytes);
 			//printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
 			
 			//printf(".\n");
