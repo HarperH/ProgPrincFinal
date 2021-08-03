@@ -25,6 +25,10 @@ int create_socket(SOCKET *s);
 int connect_to_server(SOCKET *s);
 void navigate_directories(SOCKET *s);
 int receiveFile(char fileName[], SOCKET *socket);
+char *string_concat(char *string1, char *string2);
+char *string_concat_backslash(char *string1, char *string2);
+int sendFile(char fileName[], SOCKET *socket);
+int getFileSize(char filename[]);
 
 int main(int argc, char **argv)
 {
@@ -186,9 +190,7 @@ void navigate_directories(SOCKET *s){
             if(selection != -1){
                 
                 //Sends this path to the server
-                dir_name = (char *) realloc(dir_name, sizeof(dir_name) + strlen(list_files_and_folders[selection-1]));
-                strcat(dir_name, list_files_and_folders[selection-1]);
-                strcat(dir_name, "\\");
+                string_concat_backslash(dir_name, list_files_and_folders[selection-1]);
                 printf("Moving to %s\n", dir_name);
                 send(*s, dir_name, (int)strlen(dir_name), 0);
                 
@@ -283,8 +285,7 @@ void navigate_directories(SOCKET *s){
                 printf("What file would you like to have scanned: ");
                 scanf("%d", &selection);
                 
-                dir_name = (char *) realloc(dir_name, sizeof(dir_name) + strlen(list_files_and_folders[selection-1]));
-                strcat(dir_name, list_files_and_folders[selection-1]);
+                string_concat(dir_name, list_files_and_folders[selection-1]);
                 printf("Sending to %s\n", dir_name);
                 send(*s, dir_name, (int)strlen(dir_name), 0);
                 
@@ -317,8 +318,7 @@ void navigate_directories(SOCKET *s){
                 printf("What file would you like to have scanned: ");
                 scanf("%d", &selection);
                 
-                dir_name = (char *) realloc(dir_name, sizeof(dir_name) + strlen(list_files_and_folders[selection-1]));
-                strcat(dir_name, list_files_and_folders[selection-1]);
+                string_concat(dir_name, list_files_and_folders[selection-1]);
                 printf("Sending to %s\n", dir_name);
                 send(*s, dir_name, (int)strlen(dir_name), 0);
                 
@@ -351,20 +351,40 @@ void navigate_directories(SOCKET *s){
             }
         }
         
-        
         else if(selection == 3){
+            
+            
+        }
+        
+        else if(selection == 4){
             
             command = "send";
             send(*s, command, 100, 0);
+            
+            
             printf("What file would you like to have sent to you: ");
             scanf("%d", &selection);
-            
-            dir_name = (char *) realloc(dir_name, sizeof(dir_name) + strlen(list_files_and_folders[selection-1]));
-            strcat(dir_name, list_files_and_folders[selection-1]);
-            printf("Sending to %s\n", dir_name);
+            string_concat(dir_name, list_files_and_folders[selection-1]);
+            printf("Pulling %s\n", dir_name);
             send(*s, dir_name, (int)strlen(dir_name), 0);
             
             receiveFile(list_files_and_folders[selection-1], s);
+        }
+        
+        else if(selection == 5){
+            
+            printf("\n\n\n");
+            
+            for(int i = 0; i < count; i++){
+                if(strcmp(list_files_and_folders[i], "done") == 0){
+                    count = i;
+                    break;
+                }
+            }
+            for(int i = 0; i < count; i++){
+                printf("%d: %s\n", i+1, list_files_and_folders[i]);
+            }
+            
         }
     }
 }
@@ -386,7 +406,7 @@ int receiveFile(char fileName[], SOCKET *socket){
 	int checkLen;
 	
 	
-	fp = fopen(fileName,"w");
+	fp = fopen(fileName,"a");
 	fs = fdopen(*socket, "r");
 	/*
 	while(flag == 0){
@@ -399,7 +419,7 @@ int receiveFile(char fileName[], SOCKET *socket){
 	}
 	*/
 	
-	//sleep(5);
+	sleep(5);
 	//verify the file can be created
 	if(fp == NULL){
 		printf("failed to open file");
@@ -410,15 +430,16 @@ int receiveFile(char fileName[], SOCKET *socket){
 		
 		
 		//receive number of incoming characters
-		incFileSize=recv(*socket,filesize,BUFFERLEN,0);
+		incFileSize=recv(*socket,filesize,8,0);
 		if(incFileSize < 1){
 			do{
 				printf("didn't receive file size, retrying");
 				sleep(1);
-				len=recv(*socket,filesize,BUFFERLEN,0);
+				len=recv(*socket,filesize,8,0);
 				printf("\n%s\n",filesize);
 			} while (incFileSize < 1);
 		} else {
+            printf("received file size");
 			lastIdx = atoi(filesize);
 			//printf("received file size of: %d\n",lastIdx);
 		}
@@ -437,7 +458,7 @@ int receiveFile(char fileName[], SOCKET *socket){
 		while(currentIdx < lastIdx){
 
 			//n++;
-			//printf("len is: %d",len);
+			printf("len is: %d",len);
 			if(len < 0){
 				len = 0;
 				sleep(1);
@@ -445,13 +466,16 @@ int receiveFile(char fileName[], SOCKET *socket){
 			currentIdx += len;
 			buffer[len] = '\0';
 			fputs(buffer,fp);
-			//printf("copied: %s\n",buffer);
+			printf("copied: %s\n",buffer);
 
-			//printf("%d out of %d\n", currentIdx,lastIdx);
-			
+			printf("%d out of %d\n", currentIdx,lastIdx);
+			if(currentIdx == lastIdx){
+                break;
+            }
 			len=recv(*socket,buffer,BUFFERLEN,0);
 			//printf("len is: %d\n",len);
-		}
+	
+        }
 		
 		//printf("last len: %d",len);
 		
@@ -459,4 +483,94 @@ int receiveFile(char fileName[], SOCKET *socket){
 		//return to to show success
 		return(1);
 	}
+}
+
+char *string_concat_backslash(char *string1, char *string2){
+    
+    int size_of_strings = strlen(string1) + strlen(string2);
+
+    string1 = realloc (string1, size_of_strings*sizeof(char) + 2);
+
+    memcpy(string1 + strlen(string1), string2, strlen(string2) + 1);
+    
+    memcpy(string1 + strlen(string1), "\\", sizeof("\\"));
+
+    return string1;
+}
+
+char *string_concat(char *string1, char *string2){
+    
+    int size_of_strings = strlen(string1) + strlen(string2);
+
+    string1 = realloc (string1, size_of_strings*sizeof(char) + 2);
+
+    memcpy(string1 + strlen(string1), string2, strlen(string2) + 1);
+
+    return string1;
+}
+
+int sendFile(char fileName[], SOCKET *socket){
+	
+	FILE *fp;
+	FILE *fs;
+	char buffer[500];
+	char filesize[8];
+	int fileSizeTest;
+	int outFileSize;
+	int currentIdx = 0;
+	int lastIdx;
+	int n;
+	int sentBytes = 0;
+	
+	fp = fopen(fileName, "r");
+	
+	//check if file was successfully opened
+	if(fp == NULL){
+		printf("failed to open file");
+		return(0);
+		
+	} else {
+		
+		//find size of file so other side knows how many
+		//bytes to wait for
+		fileSizeTest = getFileSize(fileName);
+		itoa(fileSizeTest,filesize,10);
+		send(*socket, filesize, 8 , 0);
+		//printf("sent filesize of: %s\n",filesize);
+		
+		do{
+			
+			//get chunk of data from file and add length to idx
+			fgets(buffer, 500, fp);
+			n = strlen(buffer);
+			currentIdx += n;
+			
+			//send data across stream
+			sentBytes = send(*socket , buffer , strlen(buffer) , 0);
+			
+			//printf("sent: %d\n",sentBytes);
+			//printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
+			
+			//printf(".\n");
+		} while(currentIdx < fileSizeTest);
+		
+		printf("sent file");
+		//printf("sent %d out of %d",currentIdx,fileSizeTest);
+		
+		return(1);
+	}
+}
+
+//count number of chars in a file
+int getFileSize(char fileName[]){
+	
+	FILE *fp;
+	char nextChar;
+	int charCount = 0;
+	fp = fopen(fileName, "r");
+	while((nextChar = fgetc(fp)) != EOF){
+		charCount++;
+	}
+	//printf("%d",charCount);
+	return(charCount);
 }
