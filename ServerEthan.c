@@ -6,9 +6,26 @@
 #include <dirent.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+#include <ctype.h>
+#include <io.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+
 
 #define MAX_FILE_NAME_LENGTH 100
 #define MAX_NUMBER_OF_FOLDERS 500
+#define COMLENGTH 30
+
+typedef struct
+{
+  char thisWord[30];
+}word;
+
 
 int init_winsock(WSADATA *ws);
 int create_socket(SOCKET *s);
@@ -18,12 +35,21 @@ int accept_socket_request(SOCKET *socket, SOCKET *client);
 void navigate_directories(SOCKET *socket, SOCKET *client);
 void scan_directories(char directory_path[], SOCKET *client);
 int recieve_information(SOCKET *client);
+int isExactMatch(char fileName[], char searchFor[]);
+int isRoughMatch(char fileName[], char searchFor[],int characters);
+int getWord(FILE *searchThrough, word *currentWord);
+void makeLowercase(char word[]);
+void cleanString(char string[]);
+int closeWord(char keyWord[],char currentWord[],int characters);
+int continueCheck(char keyword[],char currentWord[]);
+int sendFile(char fileName[], SOCKET *socket);
+int getFileSize(char filename[]);
+
 
 int main(int argc, char **argv)
 {
     SOCKET sock, client_socket;
     WSADATA winsock;
-    int flag = 0;
     
     
     init_winsock(&winsock);
@@ -131,7 +157,6 @@ void scan_directories(char directory_path[], SOCKET *client){
     printf("Directory being scanned: %s\n", directory_path);
     
     char list_files_and_folders[MAX_NUMBER_OF_FOLDERS][MAX_FILE_NAME_LENGTH];
-    char *message;
     int count = 0;
     DIR *given_directory = opendir(directory_path);
     struct dirent *stream;
@@ -194,6 +219,404 @@ int recieve_information(SOCKET *client){
                 scan_directories(command, client);
                 flag = 0;
             }
+            else if(strcmp(command, "scane") == 0){
+                
+                char filepath[MAX_FILE_NAME_LENGTH];
+                char word_search[MAX_FILE_NAME_LENGTH];
+                int match = 10;
+                
+                memset(command, 0, sizeof(command));
+                size = recv(*client, command, 2000, 0);
+                while(size == -1){
+                    size = recv(*client, command, 2000, 0);
+                }
+                strcpy(filepath, command);
+                printf("Recieved the file path to the text file: %s\n", filepath);
+                
+                memset(command, 0, sizeof(command));
+                size = recv(*client, command, 2000, 0);
+                while(size == -1){
+                    size = recv(*client, command, 2000, 0);
+                }
+                strcpy(word_search, command);
+                printf("Recieved the word: %s\n", word_search);
+                match = isExactMatch(filepath, word_search);
+                printf("%d\n", match);
+                memset(command, 0, sizeof(command));
+                sleep(3);
+                if(match == 1){
+                     send(*client, "The word is in the file.", 100, 0);
+                }
+                else{
+                    send(*client, "The word is not in the file.", 100, 0);
+                }
+            }
+            else if(strcmp(command, "scanr") == 0){
+                
+                char filepath[MAX_FILE_NAME_LENGTH];
+                char word_search[MAX_FILE_NAME_LENGTH];
+                int match = 10;
+                int tolerance;
+                
+                memset(command, 0, sizeof(command));
+                size = recv(*client, command, 2000, 0);
+                while(size == -1){
+                    size = recv(*client, command, 2000, 0);
+                }
+                strcpy(filepath, command);
+                printf("Recieved the file path to the text file: %s\n", filepath);
+                
+                memset(command, 0, sizeof(command));
+                size = recv(*client, command, 2000, 0);
+                while(size == -1){
+                    size = recv(*client, command, 2000, 0);
+                }
+                strcpy(word_search, command);
+                printf("Recieved the word: %s\n", word_search);
+                
+                memset(command, 0, sizeof(command));
+                size = recv(*client, command, 2000, 0);
+                while(size == -1){
+                    size = recv(*client, command, 2000, 0);
+                }
+                tolerance = atoi(command);
+                printf("Recieved the tolerance: %d\n", tolerance);
+                
+                match = isRoughMatch(filepath, word_search, tolerance);
+                sleep(3);
+                if(match == 1){
+                     send(*client, "There was a word found that was close.", 100, 0);
+                }
+                else{
+                    send(*client, "There was not a word found that was close.", 100, 0);
+                }
+            }
+            else if(strcmp(command, "send")){
+                
+                char filepath[MAX_FILE_NAME_LENGTH];
+                memset(command, 0, sizeof(command));
+                size = recv(*client, command, 2000, 0);
+                while(size == -1){
+                    size = recv(*client, command, 2000, 0);
+                }
+                
+                sendFile(filepath, *client);
+            }
         }
     }
+}
+
+
+//returns 1 if word(searchFor) found in file
+int isExactMatch(char fileName[], char searchFor[])
+{
+  FILE *searchThrough = fopen(fileName,"r");
+
+  if (searchThrough == NULL)
+	{
+		printf("Couldn't open file\n");
+    return -1;
+	}
+
+  /*make the word that you are looking for all lowercase so it will match the lowercase words as they come through*/
+  char keyWord[30];
+  strcpy(keyWord,searchFor);
+  makeLowercase(keyWord);
+  cleanString(keyWord);
+
+  //for the word that will be compared
+  word *currentWord = (word*) malloc(sizeof(word));
+
+  do
+  {
+    //scan the word
+    getWord(searchThrough,currentWord);
+
+    //if the file is empty stops
+    if(currentWord->thisWord[0]=='\0')
+    {
+      break;
+    }
+
+    //makes the word compareable
+    cleanString(currentWord->thisWord);
+    makeLowercase(currentWord->thisWord);
+    
+    printf("Current Word=%s\n",currentWord->thisWord);
+
+    //compare the word, change if match
+    if(strcmp(keyWord,currentWord->thisWord)==0)
+    {
+      printf("Your requested word was found exactly.\n");
+      return 1;
+      break;
+    }
+
+
+  }while(1);
+
+  fclose(searchThrough);
+
+  return 0;
+}
+
+int isRoughMatch(char fileName[], char searchFor[], int characters)
+{
+  FILE *searchThrough = fopen(fileName,"r");
+
+  if (searchThrough == NULL)
+	{
+		printf("Couldn't open file\n");
+    return -1;
+	}
+
+  /*make the word that you are looking for all lowercase so it will match the lowercase words as they come through*/
+  char keyWord[30];
+  strcpy(keyWord,searchFor);
+  makeLowercase(keyWord);
+  cleanString(keyWord);
+
+  //for the word that will be compared
+  word *currentWord = (word*) malloc(sizeof(word));
+
+  do
+  {
+    //scan the word
+    getWord(searchThrough,currentWord);
+
+    //if the file is empty stops
+    if(currentWord->thisWord[0]=='\0')
+    {
+      break;
+    }
+
+    //makes the word compareable
+    makeLowercase(currentWord->thisWord);
+    cleanString(currentWord->thisWord);
+
+    //printf("Current word: %s\n",currentWord.thisWord);
+
+    //compare the word, change if match
+    if(strcmp(keyWord,currentWord->thisWord)==0)
+    {
+      printf("Your requested word was found exactly.\n");
+      return 1;
+      break;
+    }
+    if(closeWord(keyWord,currentWord->thisWord,characters)==1)
+    {
+      printf("There was a close match to your word.\n");
+      return 1;
+      break;
+    }
+
+
+  }while(1);
+
+  fclose(searchThrough);
+
+  return 0;
+}
+
+//makes words all lowercase
+void makeLowercase(char word[])
+{
+  int strLength= strlen(word);
+
+  for(int i=0; i<strLength; i++)
+  {
+    word[i] = tolower(word[i]);
+  }
+}
+
+//makes the string into a all lowercase no punctuation or space word.
+void cleanString(char string[])
+{
+  char holdString[30];
+  int charsAdded=0;
+  char compare;
+  for(int i=0;i<strlen(string);i++)
+  {
+    compare=string[i];
+    if(('A'<=compare && compare<='Z') || ('a'<=compare && compare<='z'))
+    {
+      string[i] = tolower(compare);
+      string[charsAdded]=compare;
+      charsAdded++;
+    }
+  }
+  string[charsAdded]='\0';
+}
+
+//reads a word from the file
+int getWord(FILE *searchThrough, word *currentWord)
+{
+
+  word placeHolder;
+  int spaceIncountered=0;
+  int charsAdded=0;
+
+  char currentCharacter;
+  currentCharacter=fgetc(searchThrough);
+
+  if(currentCharacter==EOF)
+  {
+    //printf("adding blank\n");
+    placeHolder.thisWord[0]='\0';
+    strcpy(currentWord->thisWord, placeHolder.thisWord);
+    return 0;
+  }
+  
+  while( currentCharacter != EOF && spaceIncountered==0)
+  { 
+
+    if(currentCharacter==32 || currentCharacter==10)
+    {
+      //printf("SPACE INCOUNTERED\n");
+      spaceIncountered=1;
+    }
+    // if space and first disregarded
+    if(spaceIncountered==1 && charsAdded==0)
+    {
+      //printf("Reseting spaces added\n");
+      spaceIncountered=0;
+    }
+    else if(spaceIncountered==0)
+    {
+      //printf("Adding: %c\n",currentCharacter);
+      placeHolder.thisWord[charsAdded]=currentCharacter;
+      charsAdded++;
+    }
+    if(spaceIncountered==0)
+    {
+      currentCharacter= fgetc(searchThrough);
+    }
+  }
+
+  placeHolder.thisWord[charsAdded]='\0';
+  strcpy(currentWord->thisWord, placeHolder.thisWord);
+  return 0;
+}
+
+//Sees if a word has (character) many characters matching
+int closeWord(char keyWord[],char currentWord[],int characters)
+{
+  //printf("New word: %s\n",currentWord);
+  int mostConsecutive=0;
+  int currentConsecutive=0;
+
+  for(int i=0;i< strlen(keyWord); i++)
+  {
+    for(int j=0;j<strlen(currentWord);j++)
+    {
+      if(keyWord[i]==currentWord[j])
+      {
+        currentConsecutive=continueCheck(&keyWord[i],&currentWord[j]);
+        if(currentConsecutive>mostConsecutive)
+        {
+          mostConsecutive=currentConsecutive;
+        }
+      }
+    }
+  }
+
+  if(mostConsecutive>=characters)
+  {
+    return 1;
+  }
+
+  return 0;
+}
+
+//takes a matching character and sees how many match after that
+int continueCheck(char keyword[],char currentWord[])
+{
+  int matchingChars=1;
+  int max=0;
+  if(strlen(keyword)>strlen(currentWord))
+  {
+    max=strlen(currentWord);
+  }
+  else
+  {
+    max=strlen(keyword);
+  }
+  for(int i=1; i<max; i++)
+  {
+    if(keyword[i]==currentWord[i])
+    {
+      matchingChars++;
+    }
+    else
+    {
+      return matchingChars;
+    }
+  }
+  return matchingChars;
+}
+
+int sendFile(char fileName[], SOCKET *socket){
+	
+	FILE *fp;
+	FILE *fs;
+	char buffer[500];
+	char filesize[8];
+	int fileSizeTest;
+	int outFileSize;
+	int currentIdx = 0;
+	int lastIdx;
+	int n;
+	int sentBytes = 0;
+	
+	fp = fopen(fileName, "r");
+	
+	//check if file was successfully opened
+	if(fp == NULL){
+		printf("failed to open file");
+		return(0);
+		
+	} else {
+		
+		//find size of file so other side knows how many
+		//bytes to wait for
+		fileSizeTest = getFileSize(fileName);
+		itoa(fileSizeTest,filesize,10);
+		send(*socket, filesize, 8 , 0);
+		//printf("sent filesize of: %s\n",filesize);
+		
+		do{
+			
+			//get chunk of data from file and add length to idx
+			fgets(buffer, 500, fp);
+			n = strlen(buffer);
+			currentIdx += n;
+			
+			//send data across stream
+			sentBytes = send(*socket , buffer , strlen(buffer) , 0);
+			
+			//printf("sent: %d\n",sentBytes);
+			//printf("sending %d out of %d, n was %d\n",currentIdx,lastIdx,n);
+			
+			//printf(".\n");
+		} while(currentIdx < fileSizeTest);
+		
+		printf("sent file");
+		//printf("sent %d out of %d",currentIdx,fileSizeTest);
+		
+		return(1);
+	}
+}
+
+//count number of chars in a file
+int getFileSize(char fileName[]){
+	
+	FILE *fp;
+	char nextChar;
+	int charCount = 0;
+	fp = fopen(fileName, "r");
+	while((nextChar = fgetc(fp)) != EOF){
+		charCount++;
+	}
+	//printf("%d",charCount);
+	return(charCount);
 }
