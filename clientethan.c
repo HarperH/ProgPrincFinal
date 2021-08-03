@@ -125,13 +125,15 @@ void navigate_directories(SOCKET *s){
     //Displays C Drive Information
     int len;
     char *command;
-    char message[100];
+    char message[MAX_FILE_NAME_LENGTH];
     command = "init";
     char list_files_and_folders[MAX_FILE_NAME_LENGTH][MAX_NUMBER_OF_FOLDERS];
     int count = 0;
     int flag = 0;
     int size;
     int selection;
+    char word[MAX_FILE_NAME_LENGTH];
+    char toler[MAX_FILE_NAME_LENGTH];
     
     //Sends Command to Server to request C Drive Info
     printf("Sending C Drive request to server.\n");
@@ -194,8 +196,6 @@ void navigate_directories(SOCKET *s){
                 printf("Moving to %s\n", dir_name);
                 send(*s, dir_name, (int)strlen(dir_name), 0);
                 
-                
-                //gcc clientethan.c -o main -lws2_32
                 count = 0;
                 size = -1;
                 flag = 0;
@@ -300,7 +300,6 @@ void navigate_directories(SOCKET *s){
                 }
                 
                 printf("What word would you like to search for: ");
-                char word[MAX_FILE_NAME_LENGTH];
                 scanf("%s", word);
                 send(*s, word, (int)strlen(word), 0);
                 printf("Waiting for results...\n");
@@ -333,12 +332,10 @@ void navigate_directories(SOCKET *s){
                 }
                 
                 printf("What word would you like to search for: ");
-                char word[MAX_FILE_NAME_LENGTH];
                 scanf("%s", word);
                 send(*s, word, (int)strlen(word), 0);
                 
                 printf("How many characters would you like to be consistently matching: ");
-                char toler[100];
                 scanf("%s", toler);
                 send(*s, word, (int)strlen(word), 0);
                 printf("Waiting for results...\n");
@@ -353,7 +350,13 @@ void navigate_directories(SOCKET *s){
         
         else if(selection == 3){
             
-            
+                command = "creat";
+                send(*s, command, 100, 0);
+                
+                printf("Enter the file path that you would like to send: ");
+                scanf("%s", &message);
+                
+                sendFile(message, *s);
         }
         
         else if(selection == 4){

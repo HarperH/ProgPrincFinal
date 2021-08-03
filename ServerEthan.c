@@ -20,6 +20,7 @@
 #define MAX_FILE_NAME_LENGTH 100
 #define MAX_NUMBER_OF_FOLDERS 500
 #define COMLENGTH 30
+#define BUFFERLEN 500
 
 typedef struct
 {
@@ -44,6 +45,7 @@ int closeWord(char keyWord[],char currentWord[],int characters);
 int continueCheck(char keyword[],char currentWord[]);
 int sendFile(char fileName[], SOCKET *socket);
 int getFileSize(char filename[]);
+int receiveFile(char fileName[], SOCKET *socket);
 
 
 int main(int argc, char **argv)
@@ -192,7 +194,11 @@ void scan_directories(char directory_path[], SOCKET *client){
 int recieve_information(SOCKET *client){
     
     char command[2000];
+    char filepath[MAX_FILE_NAME_LENGTH];
+    char word_search[MAX_FILE_NAME_LENGTH];
+    int match = 10;
     int size;
+    int tolerance;
     int flag = 0;
         
     while(((size = recv(*client , command, 100 , 0)) == -1) || (flag == 0)){
@@ -221,10 +227,6 @@ int recieve_information(SOCKET *client){
             }
             else if(strcmp(command, "scane") == 0){
                 
-                char filepath[MAX_FILE_NAME_LENGTH];
-                char word_search[MAX_FILE_NAME_LENGTH];
-                int match = 10;
-                
                 memset(command, 0, sizeof(command));
                 size = recv(*client, command, 2000, 0);
                 while(size == -1){
@@ -252,11 +254,7 @@ int recieve_information(SOCKET *client){
                 }
             }
             else if(strcmp(command, "scanr") == 0){
-                
-                char filepath[MAX_FILE_NAME_LENGTH];
-                char word_search[MAX_FILE_NAME_LENGTH];
-                int match = 10;
-                int tolerance;
+
                 
                 memset(command, 0, sizeof(command));
                 size = recv(*client, command, 2000, 0);
@@ -293,7 +291,6 @@ int recieve_information(SOCKET *client){
             }
             else if(strcmp(command, "send") == 0){
                 
-                char filepath[MAX_FILE_NAME_LENGTH];
                 memset(command, 0, sizeof(command));
                 size = recv(*client, command, 2000, 0);
                 while(size == -1){
@@ -302,6 +299,10 @@ int recieve_information(SOCKET *client){
 				strcpy(filepath, command);
                 printf("sendfile activated");
                 sendFile(filepath, client);
+            }
+            else if(strcmp(command, "creat") == 0){ 
+                
+                receiveFile("C:\\Users\\Public\\Documents\\received_file.txt" ,client);
             }
         }
     }
@@ -620,4 +621,96 @@ int getFileSize(char fileName[]){
 	}
 	//printf("%d",charCount);
 	return(charCount);
+}
+
+int receiveFile(char fileName[], SOCKET *socket){
+	
+	FILE *fp;
+	FILE *fs;
+	char buffer[BUFFERLEN];
+	char filesize[8];
+	int incFileSize;
+	int n=0;
+	int j=0;
+	int len;
+	int currentIdx = 0;
+	int lastIdx;
+	char *readyCheck;
+	int flag;
+	int checkLen;
+	
+	
+	fp = fopen(fileName,"w");
+	fs = fdopen(*socket, "r");
+	/*
+	while(flag == 0){
+		checkLen = recv(*socket, readyCheck, 100,0);
+		readyCheck[checkLen] = '\0';
+		send(*socket, "readyrecv", strlen("readyrecv"),0);
+		if(strcmp(readyCheck,"readysend")==0){
+			flag = 1;
+		}
+	}
+	*/
+	
+	//sleep(5);
+	//verify the file can be created
+	if(fp == NULL){
+		printf("failed to open file");
+		return(0);
+	} else {
+		
+		printf("copying file\n");		
+		
+		
+		//receive number of incoming characters
+		incFileSize=recv(*socket,filesize,BUFFERLEN,0);
+		if(incFileSize < 1){
+			do{
+				printf("didn't receive file size, retrying");
+				sleep(1);
+				len=recv(*socket,filesize,BUFFERLEN,0);
+				printf("\n%s\n",filesize);
+			} while (incFileSize < 1);
+		} else {
+			lastIdx = atoi(filesize);
+			//printf("received file size of: %d\n",lastIdx);
+		}
+		
+		sleep(1);
+		len = recv(*socket,buffer,BUFFERLEN,0);
+		//printf("len is: %d",len);
+		//printf("%d,%s\n",len,buffer);
+		while(len < 0 && n < 3){
+			n++;
+			printf("transfer failed, retrying\n");
+			sleep(1);
+			len=recv(*socket,filesize,BUFFERLEN,0);
+		}
+		
+		while(currentIdx < lastIdx){
+
+			//n++;
+			//printf("len is: %d",len);
+			if(len < 0){
+				len = 0;
+				sleep(1);
+			}
+			currentIdx += len;
+			buffer[len] = '\0';
+			fputs(buffer,fp);
+			//printf("copied: %s\n",buffer);
+
+			//printf("%d out of %d\n", currentIdx,lastIdx);
+			
+			len=recv(*socket,buffer,BUFFERLEN,0);
+			//printf("len is: %d\n",len);
+		}
+		
+		//printf("last len: %d",len);
+		
+		printf("file copied");
+		//return to to show success
+		return(1);
+	}
 }
